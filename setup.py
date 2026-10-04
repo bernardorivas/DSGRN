@@ -23,6 +23,9 @@ class CMakeExtension(Extension):
 
 class CMakeBuild(build_ext):
     def build_extension(self, ext):
+        # Installed via the build-system requirements in pyproject.toml
+        import pybind11
+
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
 
         # Required for auto-detection of auxiliary "native" libs
@@ -36,10 +39,13 @@ class CMakeBuild(build_ext):
 
         cmake_args = [
             "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={}".format(extdir),
-            "-DPYTHON_EXECUTABLE={}".format(sys.executable),
+            # FindPython (PYBIND11_FINDPYTHON in CMakeLists.txt) reads Python_EXECUTABLE
+            "-DPython_EXECUTABLE={}".format(sys.executable),
             "-DEXAMPLE_VERSION_INFO={}".format(self.distribution.get_version()),
             "-DCMAKE_BUILD_TYPE={}".format(cfg),  # Not used on MSVC
-            "-DUSER_INCLUDE_PATH=./src/DSGRN/_dsgrn/include"
+            "-DUSER_INCLUDE_PATH=./src/DSGRN/_dsgrn/include",
+            # Use the pybind11 from the build environment, not a system-wide one
+            "-Dpybind11_DIR={}".format(pybind11.get_cmake_dir())
         ]
 
         build_args = ['--config', cfg]
