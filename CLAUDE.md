@@ -77,6 +77,8 @@ pytest tests/test_basic.py::test_build_network
 
 `origin` is `bernardorivas/DSGRN`, a fork of `marciogameiro/DSGRN`. That repository does the releases and tags; add it as remote `upstream` if missing. It is in turn a fork of `shaunharker/DSGRN`, which has been dormant since 2019.
 
+This checkout is the canonical local copy of DSGRN. Other local clones were removed on 2026-10-04. Projects install it into their venvs with `pip install ~/Work/Software/DSGRN` and do not keep their own copies. Two vendored `DSGRN_utils` copies remain until their projects move to `DSGRN.Blowup`: `~/Work/Projects/rook-fields/code/DSGRN_utils` and `~/Work/Projects/control-in-dsgrn/DSGRN_utils`.
+
 PyPI wheels are not built from this repository's `setup.py`. They come from a separate private repository, `marciogameiro/DSGRN_Wheels`, which uses its own scikit-build-core configuration. Changes to `setup.py` or `pyproject.toml` here affect only source installs: the sdist, `pip install git+...`, and `./install.sh`.
 
 ## Releases
