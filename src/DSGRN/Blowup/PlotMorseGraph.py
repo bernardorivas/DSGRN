@@ -29,9 +29,9 @@ def PlotMorseGraph(morse_graph, cmap=None, clist=None, alpha=0.7, shape=None, ma
     # Number of vertices
     num_verts = len(morse_graph.vertices())
     # Set colormap for Morse graph
-    if cmap == None and clist == None:
+    if cmap is None and clist is None:
         clist = default_clist
-    if cmap == None:
+    if cmap is None:
         cmap = matplotlib.colors.ListedColormap(clist[:num_verts])
     # Get number of colors in the colormap
     try:
@@ -46,9 +46,9 @@ def PlotMorseGraph(morse_graph, cmap=None, clist=None, alpha=0.7, shape=None, ma
         # Normalization for color map
         cmap_norm = matplotlib.colors.Normalize(vmin=0, vmax=num_verts-1)
     # Set default values for graphviz
-    if shape == None:
+    if shape is None:
         shape = 'ellipse'
-    if margin == None:
+    if margin is None:
         margin = '0.0, 0.04'
         # margin = '0.11, 0.055'
     margin = str(margin)

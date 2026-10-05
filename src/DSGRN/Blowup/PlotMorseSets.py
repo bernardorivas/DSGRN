@@ -78,7 +78,7 @@ def PlotMorseSets(morse_graph, stg, graded_complex, morse_nodes=None, proj_dims=
 
     def in_projection_slice(coords):
         """Check if cell is in correct slice if a projection slice is given"""
-        if proj_slice == None:
+        if proj_slice is None:
             return True
         for k in range(dim):
             if k not in {d1, d2} and coords[k] != proj_slice[k]:
@@ -174,12 +174,12 @@ def PlotMorseSets(morse_graph, stg, graded_complex, morse_nodes=None, proj_dims=
     # Number of Morse sets
     num_morse_sets = len(morse_graph.vertices())
     # Get list of Morse nodes to plot if not given
-    if morse_nodes == None:
+    if morse_nodes is None:
         morse_nodes = range(num_morse_sets)
     # Set colormap for Morse sets
-    if cmap == None and clist == None:
+    if cmap is None and clist is None:
         clist = default_clist
-    if cmap == None:
+    if cmap is None:
         cmap = matplotlib.colors.ListedColormap(clist[:num_morse_sets])
     # Get number of colors in the colormap
     try:
@@ -194,7 +194,7 @@ def PlotMorseSets(morse_graph, stg, graded_complex, morse_nodes=None, proj_dims=
         # Normalization for color map
         cmap_norm = matplotlib.colors.Normalize(vmin=0, vmax=num_morse_sets-1)
     # Projection dimensions
-    if proj_dims == None:
+    if proj_dims is None:
         d1 = 0
         d2 = 1
     else:
@@ -345,7 +345,7 @@ def PlotMorseSets(morse_graph, stg, graded_complex, morse_nodes=None, proj_dims=
     # Set patch properties
     p2.set_linewidths(line_width)
     # Create figure axis if ax is None
-    if ax == None:
+    if ax is None:
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     # Add collections to the axis
     ax.add_collection(p2)
