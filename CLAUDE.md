@@ -56,10 +56,11 @@ pytest tests/test_basic.py::test_build_network
   - Attractor counts agree with the C++ results on networks without self-edges. With self-edges they can differ.
   - It was absorbed from the former external package `DSGRN_utils`.
   - The multivalued maps F_0..F_4 follow the rook fields monograph (`Rook_Field_Paper_v2`), as ported from the vendored `DSGRN_utils` in `bernardorivas/RookFields`. Local copy: `~/Work/projects/rook-fields/code/DSGRN_utils`; the manuscript is in `~/Work/projects/rook-fields/paper/Rook_Field_Paper_v2`.
-  - `legacy=True` restores the previous upstream behavior, for reproducing old figures. It is accepted by `CubicalBlowupGraph`, `ConleyMorseGraph`, `save_morse_graph_database_json`, `StabilityQuery`, `IsomorphismQuery` and `ramp_system_wall_labelling`.
+  - The default level is 3 (F_3; F_4 = F_3 under the paper's definitions). It is used in every dimension, without restriction or warning.
+  - `legacy=True` restores the previous upstream behavior, for reproducing old figures; pass `level=4` too, the previous default. It is accepted by `CubicalBlowupGraph`, `ConleyMorseGraph`, `save_morse_graph_database_json`, `StabilityQuery`, `IsomorphismQuery` and `ramp_system_wall_labelling`.
   - For DSGRN parameters, the new F_i have differed from legacy only in dimension 3 and higher; no 2D difference has been measured.
   - `ramp_system_wall_labelling` evaluates the outer walls at GB_n (eq:GAB), unlike the RookFields copy, which keeps theta + 10h unless `global_bound` is passed.
-  - Not implemented, pending the authors: condition (iii) of `defn:indecisive`.
+  - Condition (iii) of `defn:indecisive` is implemented (`lower_dimensional_consistency`). Back walls outside X are skipped, which makes the condition vacuous at bdy(X).
 - The top-level `BlowupGraph.py` module is a separate, older implementation that `Blowup/` does not use.
 - `Query/`: queries over the SQLite databases written by `Signatures`. Tables: `Signatures`, `MorseGraphViz`, `MorseGraphVertices`, `MorseGraphEdges`, `MorseGraphAnnotations`, `Network`. `Query.Database` rebuilds the `Network`/`ParameterGraph` from the stored spec.
 - `BlowupGraph`, `SubdomainGraph`, `EquilibriumCells` and `SaveDatabaseJSON` build cubical complexes with pychomp. The pip package is `pychomp2`, but it is imported as `pychomp`.
