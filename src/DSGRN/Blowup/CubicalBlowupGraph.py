@@ -10,7 +10,24 @@ import DSGRN
 import pychomp
 
 class CubicalBlowupGraph:
-    def __init__(self, parameter=None, labelling=None, num_thresholds=None, self_edges=True, level=4):
+    """State transition graph on the top cells of the blowup complex.
+
+    The multivalued maps F_0, ..., F_4 follow the definitions of the rook
+    fields monograph (`Rook_Field_Paper_v2`), as aligned in the vendored
+    DSGRN_utils of github.com/bernardorivas/RookFields. Passing `legacy=True`
+    restores the earlier behavior of this file, which is needed to reproduce
+    figures produced before the alignment; the differences are documented at
+    each use of `self.legacy` below and measured in RookFields'
+    `rookfields/reports/FINDINGS.md`.
+    """
+
+    def __init__(self, parameter=None, labelling=None, num_thresholds=None, self_edges=True,
+                 level=4, legacy=False, strict_intersection=False):
+        # Reproduce the superseded semantics of this file when requested
+        self.legacy = legacy
+        # Evaluate every condition of the intersection even where one provably
+        # cannot fire, and assert that it does not. Slower; used by tests.
+        self.strict_intersection = strict_intersection
         # Check if input arguments are valid
         if parameter is None and (labelling is None or num_thresholds is None):
             raise ValueError('Either parameter or labelling and num_thresholds must be provided.')
@@ -86,6 +103,18 @@ class CubicalBlowupGraph:
         self.blowup_jump = [1]
         for k in self.blowup_grid_size:
             self.blowup_jump.append(self.blowup_jump[-1] * k)
+        # Memo tables for the cell-indexed quantities.  Every one of these is a
+        # pure function of the cell and the (fixed) labelling, and each is
+        # recomputed many times while the multivalued map is assembled -- see
+        # TODO 1 at the top of this file.
+        self._top_star_cache = {}
+        self._star_cache = {}
+        self._rook_component_cache = {}
+        self._gradient_cache = {}
+        self._opaque_cache = {}
+        self._equilibrium_cache = {}
+        self._reg_map_cache = {}
+        self._semi_opaque_cache = {}
         # State Transition Graph (STG) on top cells (including fringe) of Xb
         self.digraph = pychomp.DiGraph()
         # # Add top cells of Xb (including fringe) as vertices
@@ -170,17 +199,23 @@ class CubicalBlowupGraph:
 
     def star(self, cc_cell):
         """Return the list of cells in the star of cc_cell"""
-        # Get the star of cc_cell (discard fringe cells)
-        cell_star = [cell for cell in self.cubical_complex.star({cc_cell})
-                     if not self.cubical_complex.rightfringe(cell)]
-        return cell_star
+        cached = self._star_cache.get(cc_cell)
+        if cached is None:
+            # Get the star of cc_cell (discard fringe cells)
+            cached = [cell for cell in self.cubical_complex.star({cc_cell})
+                      if not self.cubical_complex.rightfringe(cell)]
+            self._star_cache[cc_cell] = cached
+        return cached
 
     def top_star(self, cc_cell):
         """Return the list of cells in the top star of cc_cell"""
-        # Get the top star of cc_cell (discard fringe cells)
-        cell_top_star = [top_cell for top_cell in self.cubical_complex.topstar(cc_cell)
-                         if not self.cubical_complex.rightfringe(top_cell)]
-        return cell_top_star
+        cached = self._top_star_cache.get(cc_cell)
+        if cached is None:
+            # Get the top star of cc_cell (discard fringe cells)
+            cached = [top_cell for top_cell in self.cubical_complex.topstar(cc_cell)
+                      if not self.cubical_complex.rightfringe(top_cell)]
+            self._top_star_cache[cc_cell] = cached
+        return cached
 
     def adjacent_top_cells(self, cc_cell, n):
         """Return the list of (left, right) pairs of n-adjacent top cells of cc_cell"""
@@ -216,6 +251,15 @@ class CubicalBlowupGraph:
 
     def rook_field_component(self, cc_cell, cc_top_cell, n):
         """Return the n-th component of the rook field of cc_cell with respect to cc_top_cell"""
+        key = (cc_cell, cc_top_cell, n)
+        cached = self._rook_component_cache.get(key)
+        if cached is not None:
+            return cached
+        value = self._rook_field_component(cc_cell, cc_top_cell, n)
+        self._rook_component_cache[key] = value
+        return value
+
+    def _rook_field_component(self, cc_cell, cc_top_cell, n):
         cell_inessential = self.inessential_directions(cc_cell)
         if n in cell_inessential:
             cell_coords = self.cubical_complex.coordinates(cc_cell)
@@ -232,6 +276,14 @@ class CubicalBlowupGraph:
 
     def gradient_directions(self, cc_cell):
         """Return the list of gradient directions of cc_cell"""
+        cached = self._gradient_cache.get(cc_cell)
+        if cached is not None:
+            return cached
+        cached = self._gradient_directions(cc_cell)
+        self._gradient_cache[cc_cell] = cached
+        return cached
+
+    def _gradient_directions(self, cc_cell):
         # Get the top star of cc_cell
         cell_top_star = self.top_star(cc_cell)
         # Get rook field of cc_cell with respect to top cells in the top star
@@ -240,6 +292,14 @@ class CubicalBlowupGraph:
 
     def opaque_directions(self, cc_cell):
         """Return the list of opaque directions of cc_cell"""
+        cached = self._opaque_cache.get(cc_cell)
+        if cached is not None:
+            return cached
+        cached = self._opaque_directions(cc_cell)
+        self._opaque_cache[cc_cell] = cached
+        return cached
+
+    def _opaque_directions(self, cc_cell):
         # Get the top star of cc_cell
         cell_top_star = self.top_star(cc_cell)
         # Get rook field of cc_cell with respect to top cells in the top star
@@ -248,6 +308,14 @@ class CubicalBlowupGraph:
 
     def equilibrium_cell(self, cc_cell):
         """Return True if cc_cell is equilibrium cell and False otherwise"""
+        cached = self._equilibrium_cache.get(cc_cell)
+        if cached is not None:
+            return cached
+        cached = self._equilibrium_cell(cc_cell)
+        self._equilibrium_cache[cc_cell] = cached
+        return cached
+
+    def _equilibrium_cell(self, cc_cell):
         # Fringe cells are not equilibrium cells
         if self.cubical_complex.rightfringe(cc_cell):
             return False
@@ -297,16 +365,29 @@ class CubicalBlowupGraph:
         return False
 
     def active_regulation_map(self, cc_cell):
-        """Return the active regulation map of cc_cell"""
+        """Memoized wrapper around :meth:`compute_active_regulation_map`."""
+        cached = self._reg_map_cache.get(cc_cell)
+        if cached is None:
+            cached = self.compute_active_regulation_map(cc_cell)
+            self._reg_map_cache[cc_cell] = cached
+        return cached
+
+    def compute_active_regulation_map(self, cc_cell):
+        """Return the active regulation map o_xi of cc_cell.
+
+        Definition `def:active_regulation` (RookFields6.tex) requires both the
+        regulating direction n and its target m to be inessential, giving the
+        typed map o_xi : Act(xi) -> J_i(xi).  The superseded definition let the
+        target range over all N directions; `legacy=True` restores that.
+        """
         coords = self.cubical_complex.coordinates(cc_cell)
         # Get the interior (non-boundary) inessential directions
-        iness_inter = [n for n in self.inessential_directions(cc_cell) if coords[n] > 0 and coords[n] < self.limits[n]]
-        # # Get regulation map of cc_cell
-        # reg_map = {n: self.parameter.regulator(n, coords[n] - 1) for n in iness_inter}
-        # # Define active regulation map
-        # active_reg_map = {n: reg_map[n] for n in reg_map if self.active_regulation(cc_cell, n, reg_map[n])}
+        inessential = self.inessential_directions(cc_cell)
+        iness_inter = [n for n in inessential if coords[n] > 0 and coords[n] < self.limits[n]]
+        # Targets range over J_i(xi); the superseded definition used all directions
+        targets = range(self.dim) if self.legacy else inessential
         # Get active regulation map of cc_cell
-        active_reg_map = {n: k for n in iness_inter for k in range(self.dim) if self.active_regulation(cc_cell, n, k)}
+        active_reg_map = {n: k for n in iness_inter for k in targets if self.active_regulation(cc_cell, n, k)}
         return active_reg_map
 
     def flow_direction_top_cell(self, cc_face, cc_coface, cc_top_cell):
@@ -422,6 +503,15 @@ class CubicalBlowupGraph:
         # Get one decision wall for cc_face, cc_coface
         face_coords = self.cubical_complex.coordinates(cc_face)
         coface_coords = self.cubical_complex.coordinates(cc_coface)
+        # The back walls of `defn:back-walls` shift the coface base by 0 or 1 in
+        # every inessential direction of cc_coface. They are cells of X only
+        # when 1 <= v'_j <= K(j) for each such j; outside that range the shifted
+        # coordinates leave the complex and cell_index would wrap to an
+        # unrelated cell. Discard the pair rather than read the wrong wall.
+        if not self.legacy:
+            if any(not (1 <= coface_coords[j] <= self.num_thresholds[j])
+                   for j in self.inessential_directions(cc_coface)):
+                return tuple()
         # Pick one top cell to get decision wall
         face_top_star = self.top_star(cc_face)
         cc_face_top_cell = face_top_star[0]
@@ -468,8 +558,33 @@ class CubicalBlowupGraph:
         # cc_face is an entrance face of cc_coface
         return face_sign
 
+    def in_boundary(self, cc_cell):
+        """Return True if cc_cell lies in bdy(X)"""
+        coords = self.cubical_complex.coordinates(cc_cell)
+        return any(coords[n] == 0 or coords[n] == self.limits[n]
+                   for n in self.inessential_directions(cc_cell))
+
     def semi_opaque_cell(self, cc_cell):
-        """Return True if cc_cell is semi-opaque"""
+        """Memoized wrapper around :meth:`compute_semi_opaque_cell`."""
+        cached = self._semi_opaque_cache.get(cc_cell)
+        if cached is None:
+            cached = self.compute_semi_opaque_cell(cc_cell)
+            self._semi_opaque_cache[cc_cell] = cached
+        return cached
+
+    def compute_semi_opaque_cell(self, cc_cell):
+        """Return True if cc_cell is semi-opaque.
+
+        Definition `defn:partially_opaque` asks for a cell in X \\ (X^(N) u bdy(X))
+        whose regulation map is a bijection of Act(xi).  Checking only the
+        bijection admits top cells vacuously (their regulation map is empty) and
+        does not exclude the boundary; `legacy=True` restores that.
+        """
+        if not self.legacy:
+            if self.cubical_complex.cell_dim(cc_cell) == self.dim:
+                return False
+            if self.in_boundary(cc_cell):
+                return False
         # Get active regulation map of cc_cell
         act_reg_map = self.active_regulation_map(cc_cell)
         # Check if regulation map is a bijection onto its domain
@@ -619,11 +734,117 @@ class CubicalBlowupGraph:
                 if self.blowup_complex.rightfringe(cell2) or not self.blowup_complex.rightfringe(cell1):
                     self.digraph.add_edge(cell2, cell1)
 
+    def condition_3_1_direction(self, cc_cell1, cc_cell2):
+        """Return the Condition 3.1 direction between cc_cell1 and cc_cell2.
+
+        Condition 3.1 (`defn:Rule3.1`) removes xi -> xi' when the extension
+        directions of the pair are contained in the support of a nontrivial
+        cycle of the regulation map at the (semi-opaque) face. This is the
+        removal only; the cells of U(xi) are added separately, because
+        `defn:Rule3` unions them in unconditionally.
+        """
+        if cc_cell1 < cc_cell2:
+            cc_face, cc_coface, face_sign = cc_cell1, cc_cell2, 1
+        else:
+            cc_face, cc_coface, face_sign = cc_cell2, cc_cell1, -1
+        if not self.semi_opaque_cell(cc_face):
+            return 0
+        act_reg_map = self.active_regulation_map(cc_face)
+        cycles = [c for c in self.cycle_decomposition(act_reg_map) if len(c) > 1]
+        if not cycles:
+            return 0
+        ext_directions = set(self.extension_directions(cc_face, cc_coface))
+        if any(ext_directions <= set(cycle) for cycle in cycles):
+            return -face_sign
+        return 0
+
+    def add_unstable_cells(self):
+        """Add the edges xi -> U(xi) of Condition 3.2 for every cell.
+
+        `defn:Rule3` is F_3(xi) = ( F_2(xi) cap F_{3.1}(xi) ) u U(xi): the union
+        is unconditional, so U(xi) is not reached through the pairwise cascade.
+        """
+        for cc_cell in self.cubical_complex:
+            if self.cubical_complex.rightfringe(cc_cell):
+                continue
+            if not self.semi_opaque_cell(cc_cell):
+                continue
+            act_reg_map = self.active_regulation_map(cc_cell)
+            cycles = [c for c in self.cycle_decomposition(act_reg_map) if len(c) > 1]
+            if not cycles:
+                continue
+            cell = self.cubical2blowup(cc_cell)
+            for cc_unstable in self.unstable_cells(cc_cell, cycles):
+                self.digraph.add_edge(cell, self.cubical2blowup(cc_unstable))
+
+    def compute_paper_multivalued_map(self):
+        """Compute F_i as an intersection of refinements, then a union with U.
+
+            def:Rule2    F_2 = F_1 cap F_{2.1}
+            defn:Rule3   F_3 = ( F_2 cap F_{3.1} ) u U
+            def:Rule4    F_4 = ( F_1 cap F_{3.1} cap F_{4.1} ) u U
+
+        Each condition is evaluated independently and an edge survives only if
+        no condition removes it, which is what "maximal refinement satisfying
+        the condition" means. The alternative first-match cascade stops at the
+        first condition that orients a pair.
+        """
+        use_decision_wall = self.level > 1
+        use_cycles = self.level > 2
+        for cell1 in self.blowup_complex(self.dim):
+            cc_cell1 = self.blowup2cubical(cell1)
+            # Condition 1.1: the self edge survives only at equilibrium cells
+            if self.self_edges and self.equilibrium_cell(cc_cell1):
+                self.digraph.add_edge(cell1, cell1)
+            for cell2 in self.parallel_neighbors(cell1):
+                fringe1 = self.blowup_complex.rightfringe(cell1)
+                fringe2 = self.blowup_complex.rightfringe(cell2)
+                if fringe1:
+                    self.digraph.add_edge(cell1, cell2)
+                if fringe2:
+                    self.digraph.add_edge(cell2, cell1)
+                if fringe1 or fringe2:
+                    continue
+                cc_cell2 = self.blowup2cubical(cell2)
+                flow = self.flow_direction(cc_cell1, cc_cell2)
+                verdicts = [flow]
+                # Condition 2.1 applies only to pairs of D(Phi), and every
+                # GO-pair leaves an F_1 double edge -- the argument of
+                # `cor:F2-well-defined`. So the decision wall cannot fire on a
+                # pair F_1 has already oriented, and evaluating it there is
+                # wasted work; in six dimensions that is the dominant cost.
+                # `strict_intersection` disables the skip and asserts it.
+                if use_decision_wall and (flow == 0 or self.strict_intersection):
+                    decision = self.decision_wall_direction(cc_cell1, cc_cell2)
+                    if flow != 0 and decision not in (0, flow):
+                        raise AssertionError(
+                            'Condition 2.1 contradicted F_1 at '
+                            f'({cc_cell1}, {cc_cell2}): {flow} vs {decision}'
+                        )
+                    verdicts.append(decision)
+                if use_cycles:
+                    verdicts.append(self.condition_3_1_direction(cc_cell1, cc_cell2))
+                # -1 removes cell1 -> cell2; +1 removes cell2 -> cell1
+                remove_forward = any(v == -1 for v in verdicts)
+                remove_backward = any(v == 1 for v in verdicts)
+                if remove_forward and remove_backward:
+                    continue
+                if not remove_forward:
+                    self.digraph.add_edge(cell1, cell2)
+                if not remove_backward:
+                    self.digraph.add_edge(cell2, cell1)
+        if use_cycles:
+            self.add_unstable_cells()
+
     def compute_multivalued_map(self):
         """Compute the multivalued map (digraph) on top cells of the blowup complex"""
         # Compute trivial map for level 0
         if self.level == 0:
             self.trivial_multivalued_map()
+            return
+        # Use the definitions as stated unless legacy semantics were requested
+        if not self.legacy:
+            self.compute_paper_multivalued_map()
             return
         # Add edges corresponding to level 1 (multivalued map F_1)
         # Just need to add edges (vertices are automatically added)

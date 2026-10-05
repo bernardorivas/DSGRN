@@ -4,14 +4,16 @@
 import DSGRN
 import pychomp
 
-def ConleyMorseGraph(parameter=None, labelling=None, num_thresholds=None, prune_grad=True, level=4):
+def ConleyMorseGraph(parameter=None, labelling=None, num_thresholds=None, prune_grad=True,
+                     level=4, legacy=False):
     # Check if input arguments are valid
     if parameter is None and (labelling is None or num_thresholds is None):
         raise ValueError('Either parameter or labelling and num_thresholds must be provided.')
     if parameter and (labelling or num_thresholds):
         raise ValueError('Only parameter or labelling and num_thresholds should be provided.')
     # Compute the multivalued map (state transition graph)
-    stg = DSGRN.Blowup.CubicalBlowupGraph(parameter=parameter, labelling=labelling, num_thresholds=num_thresholds, level=level)
+    stg = DSGRN.Blowup.CubicalBlowupGraph(parameter=parameter, labelling=labelling,
+                                        num_thresholds=num_thresholds, level=level, legacy=legacy)
     # Compute the flow graded complex
     (scc_dag, graded_complex) = pychomp.FlowGradedComplex(stg.complex(), stg.adjacencies())
     # Compute the connection matrix of the graded complex
