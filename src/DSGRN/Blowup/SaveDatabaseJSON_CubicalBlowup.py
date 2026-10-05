@@ -270,7 +270,7 @@ def state_transition_graph_json(fc_stg):
 
 
 def save_morse_graph_database_json(network, database_fname, param_indices=None,
-                                   verts_colors=None, thres_type=None, level=4):
+                                   verts_colors=None, thres_type=None, level=4, legacy=False):
     net_spec = network.specification()
     network = DSGRN.Network(net_spec, edge_blowup='none')
     parameter_graph = DSGRN.ParameterGraph(network)
@@ -280,7 +280,7 @@ def save_morse_graph_database_json(network, database_fname, param_indices=None,
 
     par_index = param_indices[0]
     parameter = parameter_graph.parameter(par_index)
-    morse_graph, stg, graded_complex = DSGRN.Blowup.ConleyMorseGraph(parameter, level=0)
+    morse_graph, stg, graded_complex = DSGRN.Blowup.ConleyMorseGraph(parameter, level=0, legacy=legacy)
     # fc_stg = CubicalBlowupGraph(parameter, level=0)  # level = 0 for construction
     fc_stg = stg
     network_json_data = network_json(network)
@@ -292,11 +292,11 @@ def save_morse_graph_database_json(network, database_fname, param_indices=None,
         # Compute DSGRN Plus dynamics
         parameter = parameter_graph.parameter(par_index)
         if fc_stg.dim == 2:
-            morse_graph, stg, graded_complex = DSGRN.Blowup.ConleyMorseGraph(parameter, level=level)
+            morse_graph, stg, graded_complex = DSGRN.Blowup.ConleyMorseGraph(parameter, level=level, legacy=legacy)
             fc_stg = stg
             # fc_stg = CubicalBlowupGraph(parameter, level=level)
         else:
-            morse_graph, stg, graded_complex = DSGRN.Blowup.ConleyMorseGraph(parameter, level=level)
+            morse_graph, stg, graded_complex = DSGRN.Blowup.ConleyMorseGraph(parameter, level=level, legacy=legacy)
             fc_stg = stg
             # fc_stg = CubicalBlowupGraph(parameter, level=level)
         (dag, fibration) = FlowGradedComplex(fc_stg.complex(), fc_stg.adjacencies())
