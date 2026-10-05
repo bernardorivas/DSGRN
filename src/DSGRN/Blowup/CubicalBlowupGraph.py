@@ -1,13 +1,12 @@
 ### CubicalBlowupGraph.py
 ### MIT LICENSE 2024 Marcio Gameiro
 
-# TODO: 1) Maybe cache regulation map and cycle decomposition to increase performance
-#       2) Level 3 and 4 are allowed in higher dimensions (add restrictions to that?)
-#       3) The default value of self_edges is True (change it to False?)
-#       4) Add 3D Morse sets plotting cpabilities
+# TODO: 1) The default value of self_edges is True (change it to False?)
+#       2) Add 3D Morse sets plotting cpabilities
 
 import DSGRN
 import pychomp
+import itertools
 
 class CubicalBlowupGraph:
     """State transition graph on the top cells of the blowup complex.
@@ -22,7 +21,7 @@ class CubicalBlowupGraph:
     """
 
     def __init__(self, parameter=None, labelling=None, num_thresholds=None, self_edges=True,
-                 level=4, legacy=False, strict_intersection=False):
+                 level=3, legacy=False, strict_intersection=False):
         # Reproduce the superseded semantics of this file when requested
         self.legacy = legacy
         # Evaluate every condition of the intersection even where one provably
@@ -66,8 +65,8 @@ class CubicalBlowupGraph:
         self.dim = len(self.num_thresholds)
         # Add self edges if True (they are not necessary)
         self.self_edges = self_edges
-        # Multivalued map level (level 3 not allowed in higher dims)
-        # self.level = level if self.dim <= 3 else min(level, 2)
+        # Multivalued map level F_0, ..., F_4, used in every dimension (the default
+        # is F_3; F_4 = F_3 under the paper's definitions)
         self.level = level
         # Max values for the indices of cells in the cubical complex X
         self.limits = [k + 1 for k in self.num_thresholds]
@@ -105,8 +104,7 @@ class CubicalBlowupGraph:
             self.blowup_jump.append(self.blowup_jump[-1] * k)
         # Memo tables for the cell-indexed quantities.  Every one of these is a
         # pure function of the cell and the (fixed) labelling, and each is
-        # recomputed many times while the multivalued map is assembled -- see
-        # TODO 1 at the top of this file.
+        # recomputed many times while the multivalued map is assembled.
         self._top_star_cache = {}
         self._star_cache = {}
         self._rook_component_cache = {}
@@ -115,6 +113,7 @@ class CubicalBlowupGraph:
         self._equilibrium_cache = {}
         self._reg_map_cache = {}
         self._semi_opaque_cache = {}
+        self._cover_labels_cache = {}
         # State Transition Graph (STG) on top cells (including fringe) of Xb
         self.digraph = pychomp.DiGraph()
         # # Add top cells of Xb (including fringe) as vertices
@@ -512,6 +511,9 @@ class CubicalBlowupGraph:
             if any(not (1 <= coface_coords[j] <= self.num_thresholds[j])
                    for j in self.inessential_directions(cc_coface)):
                 return tuple()
+            # Condition (iii) of `defn:indecisive`
+            if not self.lower_dimensional_consistency(cc_face, cc_coface, n_opaque):
+                return tuple()
         # Pick one top cell to get decision wall
         face_top_star = self.top_star(cc_face)
         cc_face_top_cell = face_top_star[0]
@@ -524,6 +526,70 @@ class CubicalBlowupGraph:
         # The wall side is determined by cc_face and cc_coface (shift is uniform)
         wall_side = -1 if face_coords[n_opaque] == coface_coords[n_opaque] else 1
         return cc_new_top_cell, n_opaque, wall_side
+
+    def back_wall_labels(self, cc_face, cc_coface, n_opaque):
+        """Return the set of n_opaque-components of the rook field on the back
+        walls of (cc_face, cc_coface) (`defn:back-walls`). A back wall shifts the
+        coface base by (1 + r_n) / 2 in each inessential direction n of cc_coface,
+        for every choice of r_n in R_n(cc_face). Back walls that are not cells of
+        X (which happens only at bdy(X)) are skipped.
+        """
+        face_coords = self.cubical_complex.coordinates(cc_face)
+        coface_coords = self.cubical_complex.coordinates(cc_coface)
+        wall_side = -1 if face_coords[n_opaque] == coface_coords[n_opaque] else 1
+        coface_inessential = self.inessential_directions(cc_coface)
+        # R_n(cc_face) for each inessential direction n of cc_coface
+        face_top_star = self.top_star(cc_face)
+        rook_values = [sorted({self.rook_field_component(cc_face, cc_top_cell, n)
+                               for cc_top_cell in face_top_star})
+                       for n in coface_inessential]
+        labels = set()
+        for r in itertools.product(*rook_values):
+            new_coords = list(coface_coords)
+            for n, r_n in zip(coface_inessential, r):
+                new_coords[n] -= 1 if r_n == 1 else 0
+            if any(not (0 <= new_coords[k] <= self.num_thresholds[k]) for k in range(self.dim)):
+                continue
+            cc_top_cell = self.cubical_complex.cell_index(new_coords, self.top_shape)
+            labels.add(self.wall_label(cc_top_cell, n_opaque, wall_side))
+        return labels
+
+    def covering_pair_labels(self, cc_cell, cc_cell2, n_opaque):
+        """Return back_wall_labels of (cc_cell, cc_cell2) if the pair has a GO-pair
+        with opaque direction n_opaque, and None otherwise (memoized)"""
+        key = (cc_cell, cc_cell2, n_opaque)
+        if key not in self._cover_labels_cache:
+            labels = None
+            if (self.extension_directions(cc_cell, cc_cell2) == [n_opaque] and
+                    self.gradient_opaque_pair(cc_cell, cc_cell2)):
+                labels = self.back_wall_labels(cc_cell, cc_cell2, n_opaque)
+            self._cover_labels_cache[key] = labels
+        return self._cover_labels_cache[key]
+
+    def lower_dimensional_consistency(self, cc_face, cc_coface, n_opaque):
+        """Return True if (cc_face, cc_coface) satisfies condition (iii) of
+        `defn:indecisive`: if dim(xi) < N - 2, then for every pair (xi~, xi~') in
+        X^(N-2) x X^(N-1) with a GO-pair (n~_g, n_o), xi <= xi~ and xi' <= xi~',
+        the n_o-component of the rook field is the same on every back wall of
+        (xi, xi') and of (xi~, xi~').
+        """
+        if self.cubical_complex.cell_dim(cc_face) >= self.dim - 2:
+            return True
+        coface_star = set(self.star(cc_coface))
+        cover_labels = set()
+        for cc_cell in self.star(cc_face):
+            if self.cubical_complex.cell_dim(cc_cell) != self.dim - 2:
+                continue
+            for cc_cell2 in self.star(cc_cell):
+                if self.cubical_complex.cell_dim(cc_cell2) != self.dim - 1 or cc_cell2 not in coface_star:
+                    continue
+                labels = self.covering_pair_labels(cc_cell, cc_cell2, n_opaque)
+                if labels:
+                    cover_labels |= labels
+        # Vacuous if no covering pair has a back wall
+        if not cover_labels:
+            return True
+        return len(cover_labels | self.back_wall_labels(cc_face, cc_coface, n_opaque)) == 1
 
     def decision_wall_direction(self, cc_cell1, cc_cell2):
         """Return the decision wall (if there is one) flow direction between

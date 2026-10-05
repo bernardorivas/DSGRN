@@ -4,7 +4,7 @@
 import DSGRN
 from collections import defaultdict
 
-def StabilityQuery(network, param_indices=None, level=4, legacy=False):
+def StabilityQuery(network, param_indices=None, level=3, legacy=False):
     parameter_graph = DSGRN.ParameterGraph(network)
     if param_indices is None:
         param_indices = range(parameter_graph.size())
