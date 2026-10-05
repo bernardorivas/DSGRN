@@ -38,8 +38,9 @@ class CubicalBlowupGraph:
             # self.num_thresholds = [len(self.network.outputs(n)) for n in range(self.dim)]
             # Get parameter labelling
             labelling = parameter.labelling()
-            # Number of thresholds (same as number of out edges)
-            num_thresholds = [len(network.outputs(n)) for n in range(network.size())]
+            # Number of thresholds (same as number of out edges, except that a node
+            # with no out edges has one threshold, as in Parameter::labelling)
+            num_thresholds = [max(len(network.outputs(n)), 1) for n in range(network.size())]
         # Parameter labelling
         self.labelling = labelling
         # Number of thresholds
