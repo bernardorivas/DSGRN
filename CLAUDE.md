@@ -49,6 +49,13 @@ pytest tests/test_basic.py::test_build_network
 ### Python layer (`src/DSGRN/`)
 
 - `__init__.py` star-imports `_dsgrn` and every Python module, so everything is exposed as flat `DSGRN.*`. A new module must be added there. A new subpackage must also be added to `packages` in `setup.py`.
+- `Blowup/` is the exception: it is imported as `from . import Blowup`, not star-imported, and is used as `DSGRN.Blowup.*`. It computes Conley-Morse graphs from a cubical blowup of the phase space with pychomp, including connection matrices and Conley indices. Entry point: `ConleyMorseGraph(parameter)`, which returns `(morse_graph, stg, graded_complex)`. `Blowup.MorseGraph` is a Python function, distinct from the C++ class `DSGRN.MorseGraph`; star-importing `Blowup` would shadow that class.
+  - It rebuilds the network with `edge_blowup='none'` and does its own blowup.
+  - Its threshold counts must match `Parameter::labelling()`: `max(len(outputs), 1)` per node.
+  - It reports unstable Morse nodes (saddles, trivial-index sets) that the C++ `MorseGraph(DomainGraph(p))` does not.
+  - Attractor counts agree with the C++ results on networks without self-edges. With self-edges they can differ.
+  - It was absorbed from the former external package `DSGRN_utils`.
+- The top-level `BlowupGraph.py` module is a separate, older implementation that `Blowup/` does not use.
 - `Query/`: queries over the SQLite databases written by `Signatures`. Tables: `Signatures`, `MorseGraphViz`, `MorseGraphVertices`, `MorseGraphEdges`, `MorseGraphAnnotations`, `Network`. `Query.Database` rebuilds the `Network`/`ParameterGraph` from the stored spec.
 - `BlowupGraph`, `SubdomainGraph`, `EquilibriumCells` and `SaveDatabaseJSON` build cubical complexes with pychomp. The pip package is `pychomp2`, but it is imported as `pychomp`.
 - `ParameterPartialOrders` and `ParameterFromSample` convert between logic-parameter hex codes, threshold partial orders, and sampled parameter values.
