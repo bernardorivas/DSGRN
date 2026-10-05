@@ -6,7 +6,7 @@ from collections import defaultdict
 
 def StabilityQuery(network, param_indices=None, level=4, legacy=False):
     parameter_graph = DSGRN.ParameterGraph(network)
-    if param_indices == None:
+    if param_indices is None:
         param_indices = range(parameter_graph.size())
     param_stability = defaultdict(set)
     for par_index in param_indices:

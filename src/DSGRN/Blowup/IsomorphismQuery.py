@@ -5,9 +5,9 @@ import DSGRN
 from collections import defaultdict
 
 def IsomorphismQuery(network, param_indices=None, level=4, legacy=False):
-    """Return a list of sets of parameters with isomorphics Morse graphs"""
+    """Return a list of sets of parameters with isomorphic Morse graphs"""
     parameter_graph = DSGRN.ParameterGraph(network)
-    if param_indices == None:
+    if param_indices is None:
         param_indices = range(parameter_graph.size())
     # Dictionary of non-isomorphic Morse graphs
     distinct_morse_graphs = {}
@@ -23,7 +23,7 @@ def IsomorphismQuery(network, param_indices=None, level=4, legacy=False):
                 # Found isomorphic Morse graph
                 isomorphism_classes[par_index2].add(par_index)
                 found_match = True
-                continue
+                break
         # Create new class if match not found
         if not found_match:
             distinct_morse_graphs[par_index] = morse_graph

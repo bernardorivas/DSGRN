@@ -29,10 +29,10 @@ def network_json(network):
 def parameter_graph_json(parameter_graph, vertices=None, verts_colors=None, thres_type=None):
     # Return json data for parameter graph
     # Get list of vertices if none
-    if vertices == None:
+    if vertices is None:
         vertices = list(range(parameter_graph.size()))
     # Set empty dictionary for verts_colors if none
-    if verts_colors == None:
+    if verts_colors is None:
         verts_colors = {}
     # Set thres_type to '' if not 'T'
     if thres_type != 'T':
@@ -275,8 +275,10 @@ def save_morse_graph_database_json(network, database_fname, param_indices=None,
     network = DSGRN.Network(net_spec, edge_blowup='none')
     parameter_graph = DSGRN.ParameterGraph(network)
 
-    if param_indices == None:
+    if param_indices is None:
         param_indices = range(parameter_graph.size())
+    # Accept any iterable (set, generator, NumPy array)
+    param_indices = list(param_indices)
 
     par_index = param_indices[0]
     parameter = parameter_graph.parameter(par_index)
