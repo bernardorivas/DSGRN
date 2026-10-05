@@ -282,7 +282,7 @@ def state_transition_graph_json(fc_stg):
 
 
 def save_morse_graph_database_json(network, database_fname, param_indices=None,
-                                   verts_colors=None, thres_type=None, level=4, legacy=False):
+                                   verts_colors=None, thres_type=None, level=3, legacy=False):
     net_spec = network.specification()
     network = DSGRN.Network(net_spec, edge_blowup='none')
     parameter_graph = DSGRN.ParameterGraph(network)

@@ -5,7 +5,7 @@ import DSGRN
 import pychomp
 
 def ConleyMorseGraph(parameter=None, labelling=None, num_thresholds=None, prune_grad=True,
-                     level=4, legacy=False):
+                     level=3, legacy=False):
     # Check if input arguments are valid
     if parameter is None and (labelling is None or num_thresholds is None):
         raise ValueError('Either parameter or labelling and num_thresholds must be provided.')

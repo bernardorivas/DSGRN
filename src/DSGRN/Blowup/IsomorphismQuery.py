@@ -4,7 +4,7 @@
 import DSGRN
 from collections import defaultdict
 
-def IsomorphismQuery(network, param_indices=None, level=4, legacy=False):
+def IsomorphismQuery(network, param_indices=None, level=3, legacy=False):
     """Return a list of sets of parameters with isomorphic Morse graphs"""
     parameter_graph = DSGRN.ParameterGraph(network)
     if param_indices is None:
