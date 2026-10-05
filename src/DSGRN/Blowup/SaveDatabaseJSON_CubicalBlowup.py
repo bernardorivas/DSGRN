@@ -163,12 +163,31 @@ def blowup_cc_complex_json(fc_stg):
                                      "cells": cells}}
     return complex_json_data
 
-def morse_graph_json(CMG, connection_matrix):
+def morse_graph_vertices(CMG, legacy=False):
+    # Return the vertices of the Morse graph CMG and their node numbers. If the
+    # vertices have labels [index, num_cells, conley_index], as the Morse graphs of
+    # ConleyMorseGraph do, the node number is the index (as in PlotMorseGraph).
+    vertices = list(CMG.vertices())
+    labels = [CMG.vertex_label(v) for v in vertices]
+    if not legacy and all(isinstance(label, (list, tuple)) and len(label) == 3 for label in labels):
+        vertices.sort(key=lambda v: CMG.vertex_label(v)[0])
+    vert_index = {v: k for k, v in enumerate(vertices)}
+    return vertices, vert_index
+
+def morse_graph_json(CMG, connection_matrix, legacy=False):
     # Return json data for Morse graph
-    # CMG: Conley Morse graph, with vertex labels [index, num_cells, conley_index]
-    # (connection_matrix is no longer used; the labels already hold the Conley indices)
-    # vert_index = {v: k for k, v in enumerate(sorted(CMG.vertices()))}
-    vert_index = {v: k for k, v in enumerate(CMG.vertices())}
+    # CMG: Conley Morse graph
+    vertices, vert_index = morse_graph_vertices(CMG, legacy)
+    conley_indices = connection_matrix.count()
+    if legacy:
+        # Number nodes by connection matrix cells, as before (numbers can collide)
+        val2index = { connection_matrix.value(c): c for c in connection_matrix.complex()}
+        N = len(val2index)
+        verts_trivial_CI = [v for v in CMG.vertices() if v not in val2index]
+        val2index.update({v: N + k for k, v in enumerate(verts_trivial_CI)})
+        n = len(conley_indices[next(iter(conley_indices))])
+    else:
+        n = connection_matrix.complex().dimension() + 1
 
     def vertex_rank(u):
         # Return how many levels down of children u have
@@ -179,13 +198,17 @@ def morse_graph_json(CMG, connection_matrix):
         return 1 + max([vertex_rank(v) for v in children])
 
     def vertex_label(u):
-        # Return vertex label for Morse graph (the default label of PlotMorseGraph).
-        # Connection matrix cell indices are not used, since they can collide.
-        index, num_cells, conley_index = CMG.vertex_label(u)
-        return str(index) + " : " + str(tuple(conley_index))
+        # Return vertex label for Morse graph: node number and Conley index
+        label = CMG.vertex_label(u)
+        if not legacy and isinstance(label, (list, tuple)) and len(label) == 3:
+            conley_index = label[2]
+        else:
+            conley_index = conley_indices[u] if u in conley_indices else [0] * n
+        number = val2index[u] if legacy else vert_index[u]
+        return str(number) + " : " + str(tuple(conley_index))
 
     morse_graph_data = []  # Morse graph data
-    for u in CMG.vertices():
+    for u in vertices:
         adjacencies = [vert_index[v] for v in CMG.adjacencies(u)]
         # adjacencies = [vert_index[v] for v in CMG.children(u)]
         morse_node_data = {"node": vert_index[u],
@@ -197,10 +220,10 @@ def morse_graph_json(CMG, connection_matrix):
     return morse_graph_json_data
 
 
-def morse_sets_json(fc_stg, CMG, fibration):
+def morse_sets_json(fc_stg, CMG, fibration, legacy=False):
     # Return json data for Morse sets
     # CMG: Conley Morse graph
-    vert_index = {v: k for k, v in enumerate(CMG.vertices())}
+    vertices, vert_index = morse_graph_vertices(CMG, legacy)
 
     def fringe_cell_fc(c):
         if any(fc_stg.blowup_complex.rightfringe(s) for s in fc_stg.blowup_complex.star({c})):
@@ -223,7 +246,7 @@ def morse_sets_json(fc_stg, CMG, fibration):
         return True
 
     morse_sets_data = []  # Morse sets data
-    for u in CMG.vertices():
+    for u in vertices:
         fiber = [c for c in fibration.complex() if fibration.value(c) == u]
         morse_cells = [c for c in fiber if non_fringe_top_cell(c)]
         morse_node = vert_index[u]
@@ -266,8 +289,8 @@ def save_morse_graph_database_json(network, database_fname, param_indices=None,
 
     if param_indices is None:
         param_indices = range(parameter_graph.size())
-    # Accept any iterable (set, generator, NumPy array)
-    param_indices = list(param_indices)
+    # Accept any iterable (set, generator, NumPy array) and store plain ints
+    param_indices = [int(par_index) for par_index in param_indices]
 
     par_index = param_indices[0]
     parameter = parameter_graph.parameter(par_index)
@@ -303,8 +326,8 @@ def save_morse_graph_database_json(network, database_fname, param_indices=None,
             return len(scc_v) > 1 or any(c in fc_stg.digraph.adjacencies(c) for c in scc_v)
         # CMG = InducedPoset_E(dag, lambda v: non_trivial_scc(v) and v != fringenode)
         CMG = morse_graph
-        morse_graph_json_data = morse_graph_json(CMG, connection_matrix)
-        morse_sets_json_data = morse_sets_json(fc_stg, CMG, fibration)
+        morse_graph_json_data = morse_graph_json(CMG, connection_matrix, legacy=legacy)
+        morse_sets_json_data = morse_sets_json(fc_stg, CMG, fibration, legacy=legacy)
         stg_json_data = state_transition_graph_json(fc_stg)
         # Dynamics data for this parameter
         dynamics_json_data = {"parameter": par_index,
@@ -318,6 +341,7 @@ def save_morse_graph_database_json(network, database_fname, param_indices=None,
                             "parameter_graph": param_graph_json_data["parameter_graph"],
                             "dynamics_database": dynamics_database}
 
-    # Save database to a file
+    # Save database to a file (serialize first, so a failure leaves no partial file)
+    database_str = json.dumps(morse_graph_database)
     with open(database_fname, 'w') as outfile:
-        json.dump(morse_graph_database, outfile)
+        outfile.write(database_str)
