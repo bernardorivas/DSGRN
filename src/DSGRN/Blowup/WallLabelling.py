@@ -10,7 +10,7 @@ def ramp_system_wall_labelling(gamma, theta, h, f_ramp, global_bound=None, legac
     Definition `defn:ramp-wall-labeling` (RampSystemsv4.tex) evaluates the
     right most walls at the sentinel threshold GB_n of eq:GAB, so they always
     point inward. GB_n is computed from the ramp system unless `global_bound`
-    (a list of GB_n) is given. `legacy=True` uses theta + 10 * h instead, the
+    (a list of GB_n) is given. Otherwise `legacy=True` uses theta + 10 * h, the
     previous surrogate, which depends on h and can label an outer wall as an
     exit, i.e. the labelling need not be strongly dissipative.
     """
@@ -89,9 +89,13 @@ def ramp_system_wall_labelling(gamma, theta, h, f_ramp, global_bound=None, legac
     # Create cubical complex
     num_boxes = [k + 1 for k in num_thetas]
     cc = pychomp.CubicalComplex(num_boxes)
-    # Values of the ramp nonlinearities, which are constant on each top cell
-    f_cell = {top_cell: f_ramp(cell_point(cc.coordinates(top_cell))) for top_cell in cc(dim)}
-    if global_bound is None:
+    # Values of the ramp nonlinearities, which are constant on each top cell (copied,
+    # in case f_ramp reuses its output buffer)
+    f_cell = {top_cell: list(f_ramp(cell_point(cc.coordinates(top_cell)))) for top_cell in cc(dim)}
+    # An explicit global bound takes precedence over legacy mode
+    if global_bound is not None:
+        legacy = False
+    else:
         # GB_n = max{M^E_n / gamma_n, largest theta + its h} + 1 (eq:GAB), where
         # M^E_n is the maximum of the n-th ramp nonlinearity
         global_bound = []
